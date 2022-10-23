@@ -41,6 +41,9 @@ dev = [
 meross2homie = "meross2homie.main:main"
 meross_mqtt_password = "meross2homie.main:calc_mqtt_password_main"
 
+[tool.setuptools]
+packages = ["meross2homie"]
+
 [tool.mypy]
 ignore_missing_imports = true
 

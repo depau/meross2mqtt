@@ -12,4 +12,4 @@ RUN --mount=target=/app \
 WORKDIR /config
 VOLUME /config
 
-ENTRYPOINT ["meross2mqtt"]
+ENTRYPOINT ["python3", "-m", "meross2homie"]
