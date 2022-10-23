@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "meross2homie"
+description = "Bridge between Meross IoT devices and home automation software compatible with Homie"
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["MQTT", "IoT", "Meross", "Homie", "Mosquitto"]
+license = { text = "LGPL-3.0-or-later" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: System :: Networking",
+    "Topic :: Software Development :: Object Brokering"
+]
+dependencies = [
+    "asyncio-mqtt>=0.13.0,<0.14.0",
+    "meross_iot==0.4.5.0",
+    "isodate",
+    "yamldataclassconfig",
+    "dataclasses_json",
+    "loguru"
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "mypy",
+    "types-paho-mqtt"
+]
+
+[project.scripts]
+meross2homie = "meross2homie.main:main"
+meross_mqtt_password = "meross2homie.main:calc_mqtt_password_main"
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.black]
+line-length = 120
+target-version = ['py310', 'py311']
