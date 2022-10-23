@@ -2,9 +2,9 @@
 
 A simple bridge between Meross devices and home automation software compatible with Homie, such as openHAB.
 
-<div style="text-align: center">
-<img src="https://homieiot.github.io/img/works-with-homie.svg" alt="Works with Homie" width="200">
-</div>
+<p align="center">
+<a href="https://homieiot.github.io/"><img src="https://homieiot.github.io/img/works-with-homie.svg" alt="Works with Homie" width="200"></a>
+</p>
 
 ## Vendor cloud NOT supported
 
@@ -34,12 +34,23 @@ The following capabilities are currently supported:
 
 ### Docker
 
-Use the provided Dockerfile to build the image.
+Use the provided Dockerfile to build the image. Docker 18.09
+with [BuildKit](https://docs.docker.com/develop/develop-images/build_enhancements/) support is required.
+
+Recent docker-compose versions will use BuildKit automatically.
+
+```bash
+git clone https://github.com/Depau/meross2homie.git
+cd meross2homie
+DOCKER_BUILDKIT=1 docker build -t meross2homie .
+```
 
 Mount the configuration directory as a writable volume to `/config`. The folder must be writable since the app will need
 to store the list of discovered devices.
 
 ### Python
+
+Python 3.10 is required.
 
 ```bash
 git clone https://github.com/Depau/meross2homie.git
@@ -186,8 +197,10 @@ Open it and follow these steps to pair a new device:
 2. In the login page, select "Manual user/key setup"
 3. Enter whatever user ID and user key you prefer
    I recommend:
-  - User ID: your favorite number, or `0`
-  - User key: leave it empty
+
+- User ID: your favorite number, or `0`
+- User key: leave it empty
+
 1. Ignore the "API setup" page, just press "back"
 2. Open the side drawer and select "Pair"
 3. Grant the required permissions
