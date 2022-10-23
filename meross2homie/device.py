@@ -216,7 +216,7 @@ class MerossHomieDevice(HomieDevice):
                 HomieFloatProperty(
                     node,
                     topic="power",
-                    name="Power",
+                    name="Power usage",
                     unit="W",
                 )
 
