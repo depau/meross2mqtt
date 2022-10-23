@@ -110,10 +110,12 @@ class MerossHomieDevice(HomieDevice):
                 ]
 
                 last = sorted(stats, key=lambda x: x["timestamp"], reverse=True)[0]
+                total = sum(x["total_consumption_kwh"] for x in stats)
                 updates.append(self[_channel_topic("energy", channel_id)]["history"].update_value(stats))
                 updates.append(
                     self[_channel_topic("energy", channel_id)]["daily"].update_value(last["total_consumption_kwh"])
                 )
+                updates.append(self[_channel_topic("energy", channel_id)]["total"].update_value(total))
 
         if isinstance(md, ElectricityMixin):
             for channel_id in self.channels:
@@ -181,6 +183,12 @@ class MerossHomieDevice(HomieDevice):
                     node,
                     topic="daily",
                     name="Daily consumption",
+                    unit="kWh",
+                )
+                HomieFloatProperty(
+                    node,
+                    topic="total",
+                    name="Total consumption",
                     unit="kWh",
                 )
 
