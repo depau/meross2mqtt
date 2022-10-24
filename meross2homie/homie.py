@@ -207,7 +207,7 @@ class HomieDevice(
     async def __aenter__(self):
         await self.mqtt.__aenter__()
         logger.debug(f"Device {self.name} subscribing to {list(self.get_subscriptions())}")
-        await self.mqtt.subscribe([(i, 0) for i in self.get_subscriptions()])
+        await self.mqtt.subscribe([(i, 1) for i in self.get_subscriptions()])
         await self.refresh()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -279,7 +279,7 @@ class HomieDevice(
             topic = f"{self.topic}/{topic_suffix}"
         else:
             topic = self.topic
-        await self.mqtt.publish(topic, value, retain=retain)
+        await self.mqtt.publish(topic, value, qos=1, retain=retain)
 
 
 class HomieNode(
