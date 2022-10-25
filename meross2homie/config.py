@@ -78,7 +78,9 @@ class Config(YamlDataClassConfig):
     interview_retry_times: int = 3
     """Number of times to retry the interview in case of timeout. Default is 3 times."""
 
-    interview_retry_delay_range: Tuple[float, float] = (3, 5)
+    interview_retry_delay_range: Tuple[float, float] = field(
+        default=(3, 5), metadata=config(mm_field=fields.Tuple((fields.Float(), fields.Float())))
+    )
     """Range of seconds to wait before retrying the interview. Default is 3 to 5 seconds."""
 
 
