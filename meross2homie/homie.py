@@ -262,7 +262,7 @@ class HomieDevice(
 
     def get_attributes(self) -> dict:
         return {
-            "$homie": "4.0",
+            "$homie": "4.0.0",
             "$name": self.name,
             "$state": self.state.value,
             "$nodes": ",".join(self.children.keys()),
