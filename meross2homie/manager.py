@@ -218,7 +218,7 @@ class BridgeManager(IMerossManager):
         await self.ctx_manager.__aenter__()
         await self.ctx_manager.enter_async_context(self.mqtt)
         await self.ctx_manager.enter_async_context(self.homie)
-        await self.mqtt.subscribe([(i, 0) for i in self.subscriptions])
+        await self.mqtt.subscribe([(i, 1) for i in self.subscriptions])
         self._load_persisted_devices()
         return self
 
@@ -284,7 +284,7 @@ class BridgeManager(IMerossManager):
         self.pending_commands[message_id] = future
 
         logger.trace(f"Sending message to {uuid}: {message}")
-        await self.mqtt.publish(f"{CONFIG.meross_prefix}/{uuid}/subscribe", message)
+        await self.mqtt.publish(f"{CONFIG.meross_prefix}/{uuid}/subscribe", message, qos=1)
 
         try:
             res = await asyncio.wait_for(future, timeout)
