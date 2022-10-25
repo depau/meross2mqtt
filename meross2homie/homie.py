@@ -166,7 +166,7 @@ class Homie(GetChildrenMixin["HomieDevice"]):
         logger.info(f"Starting device '{topic}'")
         dev_mqtt = self.async_mqtt_client_factory(
             asyncio_mqtt.Will(f"{self.topic}/{topic}/$state", "lost", True),
-            f"m2h.homie_dev.{device.name}",
+            f"m2h.homie_dev.{topic}",
         )
         device.set_mqtt(dev_mqtt, f"{self.topic}/{topic}")
         self.children[device.name] = device
