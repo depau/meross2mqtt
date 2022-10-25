@@ -44,7 +44,7 @@ def mqtt_factory(
         clean_session=CONFIG.mqtt_clean_session,
     )
     # Yes Karen, you can send all of them in no time
-    client._pending_calls_threshold = 50
+    client._pending_calls_threshold = 200
 
     return client
 
