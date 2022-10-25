@@ -102,37 +102,54 @@ class BridgeManager(IMerossManager):
         logger.info("Processing events")
         await asyncio.gather(self._receive_messages(), self._poll(), self.homie.process_messages())
 
-    async def _interview(self, uuid: str):
-        system_all = await self.rpc(uuid, "GET", Namespace.SYSTEM_ALL)
-        dev_info = MerossMqttDeviceInfo.from_system_all_payload(system_all["payload"])
-        logger.info(f"Discovered device {dev_info.device_type} {dev_info.dev_name} ({dev_info.uuid})")
+    async def _interview(self, uuid: str, retries_left: Optional[int] = None):
+        if retries_left is None:
+            retries_left = CONFIG.interview_retry_times
 
-        # If we already have the device, just update the info
-        if self.homie_devices.get(uuid):
-            await self.homie_devices[uuid].update_device_info(dev_info)
-            return
+        try:
+            system_all = await self.rpc(uuid, "GET", Namespace.SYSTEM_ALL, timeout=CONFIG.interview_command_timeout)
+            dev_info = MerossMqttDeviceInfo.from_system_all_payload(system_all["payload"])
+            logger.info(f"Discovered device {dev_info.device_type} {dev_info.dev_name} ({dev_info.uuid})")
 
-        abilities = (await self.rpc(uuid, "GET", Namespace.SYSTEM_ABILITY))["payload"]["ability"]
+            # If we already have the device, just update the info
+            if self.homie_devices.get(uuid):
+                await self.homie_devices[uuid].update_device_info(dev_info)
+                return
 
-        meross_device = build_meross_device_from_abilities(dev_info, abilities, self)
-        homie_device = MerossHomieDevice(meross_device, dev_info, self)
+            abilities = (
+                await self.rpc(uuid, "GET", Namespace.SYSTEM_ABILITY, timeout=CONFIG.interview_command_timeout)
+            )["payload"]["ability"]
 
-        if (dev := CONFIG.devices.get(uuid)) and dev.pretty_topic:
-            topic = dev.pretty_topic
-        else:
-            topic = uuid
+            meross_device = build_meross_device_from_abilities(dev_info, abilities, self)
+            homie_device = MerossHomieDevice(meross_device, dev_info, self)
 
-        self.persistence.devices.add(uuid)
-        self.persistence.persist(CONFIG.persistence_file)
+            if (dev := CONFIG.devices.get(uuid)) and dev.pretty_topic:
+                topic = dev.pretty_topic
+            else:
+                topic = uuid
 
-        logger.debug(f"Registering device {uuid} as {topic}")
+            self.persistence.devices.add(uuid)
+            self.persistence.persist(CONFIG.persistence_file)
 
-        self.device_registry.enroll_device(meross_device)
-        await self.homie.add_device(homie_device, topic)
-        self.homie_devices[uuid] = homie_device
+            logger.debug(f"Registering device {uuid} as {topic}")
 
-        await homie_device.set_state(HomieState.READY)
-        logger.debug(f"Device {uuid} ready")
+            self.device_registry.enroll_device(meross_device)
+            await self.homie.add_device(homie_device, topic)
+            self.homie_devices[uuid] = homie_device
+
+            await homie_device.set_state(HomieState.READY)
+            logger.debug(f"Device {uuid} ready")
+
+        except CommandTimeoutError:
+            if retries_left > 0:
+                delay = random.uniform(*CONFIG.interview_retry_delay_range)
+                logger.exception(
+                    f"Command timed out while interviewing device {uuid}, retrying in {round(delay, 2)} seconds"
+                )
+                await asyncio.sleep(delay)
+                await self._interview(uuid, retries_left - 1)
+            else:
+                logger.exception(f"Command timed out while interviewing device {uuid}, giving up")
 
     async def _handle_message(self, topic: str, message: dict):
         # noinspection PyBroadException

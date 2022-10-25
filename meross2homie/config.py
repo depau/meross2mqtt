@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 
 from dataclasses_json import DataClassJsonMixin, config
 from marshmallow import fields
@@ -69,8 +69,17 @@ class Config(YamlDataClassConfig):
     command_timeout: int = 2
     """Timeout in seconds for commands sent to Meross devices. Default is 2 seconds."""
 
+    interview_command_timeout: int = 10
+    """Timeout in seconds for commands sent to Meross devices for the initial interview. Default is 10 seconds."""
+
     timed_out_commands_threshold: int = 3
     """Number of failed commands before the device is considered offline. Default: 3 in a row."""
+
+    interview_retry_times: int = 3
+    """Number of times to retry the interview in case of timeout. Default is 3 times."""
+
+    interview_retry_delay_range: Tuple[float, float] = (3, 5)
+    """Range of seconds to wait before retrying the interview. Default is 3 to 5 seconds."""
 
 
 CONFIG = Config()
