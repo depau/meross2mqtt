@@ -89,8 +89,15 @@ class BridgeManager(IMerossManager):
         while True:
             # noinspection PyBroadException
             try:
-                await asyncio.gather(*(i.poll() for i in self.homie_devices.values()))
-            except CommandTimeoutError:
+                await asyncio.gather(
+                    *tuple(
+                        map(
+                            lambda x: asyncio.wait_for(x, CONFIG.command_timeout * 2),
+                            (i.poll() for i in self.homie_devices.values()),
+                        )
+                    )
+                )
+            except (CommandTimeoutError, TimeoutError):
                 logger.error("Command timed out")
             except (KeyboardInterrupt, SystemExit):
                 raise
