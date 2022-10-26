@@ -322,6 +322,9 @@ class BridgeManager(IMerossManager):
 
         try:
             res = await asyncio.wait_for(future, timeout)
+            hd = self.homie_devices.get(uuid)
+            if hd is not None:
+                asyncio.create_task(hd.set_state(HomieState.READY))
             return res
         except asyncio.TimeoutError:
             self.pending_commands.pop(message_id).cancel()
