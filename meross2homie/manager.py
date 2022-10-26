@@ -91,7 +91,7 @@ class BridgeManager(IMerossManager):
             try:
                 await asyncio.gather(*(i.poll() for i in self.homie_devices.values()))
             except CommandTimeoutError:
-                logger.exception("Command timed out")
+                logger.error("Command timed out")
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception:
@@ -143,7 +143,7 @@ class BridgeManager(IMerossManager):
         except CommandTimeoutError:
             if retries_left > 0:
                 delay = random.uniform(*CONFIG.interview_retry_delay_range)
-                logger.exception(
+                logger.error(
                     f"Command timed out while interviewing device {uuid}, retrying in {round(delay, 2)} seconds"
                 )
                 await asyncio.sleep(delay)
@@ -209,7 +209,7 @@ class BridgeManager(IMerossManager):
             logger.debug(f"Received message from {uuid}: {message}")
             await self.homie_devices[uuid].on_message(message)
         except CommandTimeoutError:
-            logger.exception("Command timed out")
+            logger.error("Command timed out")
         except Exception:
             logger.exception(f"Unhandled exception while handling message: {message}")
 
