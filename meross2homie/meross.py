@@ -15,25 +15,28 @@ T = TypeVar("T")
 
 # Adapted from
 # https://github.com/albertogeniola/ha-meross-local-broker/blob/364f7abbe17625cdb342363b14772eec68a66785/meross_local_broker/rootfs/opt/custom_broker/protocol.py
-def meross_payload_encode(
+def _gen_boilerplate(dev_key: str) -> Tuple[int, str, str]:
+    md5_hash = md5()
+    md5_hash.update(str(random.randint(0xFFFFFFFF, 0xFFFFFFFFF)).encode("utf-8"))
+    message_id = md5_hash.hexdigest().lower()
+    timestamp = int(round(time.time()))
+
+    md5_hash = md5()
+    to_be_hashed = f"{message_id}{dev_key}{timestamp}"
+    md5_hash.update(to_be_hashed.encode("utf8"))
+    signature = md5_hash.hexdigest().lower()
+
+    return timestamp, message_id, signature
+
+
+def meross_mqtt_payload(
     method: str,
     namespace: str,
     payload: dict,
     dev_key: str,
     header_from: str = "/appliance/m2h-bridge/subscribe",
 ) -> Tuple[bytes, str]:
-    # Hash it as md5
-    md5_hash = md5()
-    md5_hash.update(str(random.randint(0xFFFFFFFF, 0xFFFFFFFFF)).encode("utf-8"))
-    message_id = md5_hash.hexdigest().lower()
-    timestamp = int(round(time.time()))
-
-    # Hash the messageId, the key and the timestamp
-    md5_hash = md5()
-    to_be_hashed = f"{message_id}{dev_key}{timestamp}"
-    md5_hash.update(to_be_hashed.encode("utf8"))
-    signature = md5_hash.hexdigest().lower()
-
+    timestamp, message_id, signature = _gen_boilerplate(dev_key)
     data = {
         "header": {
             "from": header_from,
@@ -48,6 +51,27 @@ def meross_payload_encode(
         "payload": payload,
     }
     return json.dumps(data).encode("utf-8"), message_id
+
+
+def meross_http_payload(
+    method: str,
+    namespace: str,
+    payload: dict,
+    dev_key: str,
+) -> dict:
+    timestamp, message_id, signature = _gen_boilerplate(dev_key)
+    data = {
+        "header": {
+            "messageId": message_id,  # Example: "122e3e47835fefcd8aaf22d13ce21859"
+            "method": method,  # Example: "GET",
+            "namespace": namespace,  # Example: "Appliance.System.All",
+            "payloadVersion": 1,
+            "sign": signature,  # Example: "b4236ac6fb399e70c3d61e98fcb68b74",
+            "timestamp": timestamp,
+        },
+        "payload": payload,
+    }
+    return data
 
 
 def is_uuid(uuid: str) -> bool:

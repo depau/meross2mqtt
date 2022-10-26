@@ -72,8 +72,8 @@ class Config(YamlDataClassConfig):
     interview_command_timeout: int = 10
     """Timeout in seconds for commands sent to Meross devices for the initial interview. Default is 10 seconds."""
 
-    timed_out_commands_threshold: int = 3
-    """Number of failed commands before the device is considered offline. Default: 3 in a row."""
+    timed_out_commands_threshold: int = 5
+    """Number of failed commands before the device is considered offline. Default: 5 in a row."""
 
     interview_retry_times: int = 3
     """Number of times to retry the interview in case of timeout. Default is 3 times."""
@@ -82,6 +82,10 @@ class Config(YamlDataClassConfig):
         default=(3, 5), metadata=config(mm_field=fields.Tuple((fields.Float(), fields.Float())))
     )
     """Range of seconds to wait before retrying the interview. Default is 3 to 5 seconds."""
+
+    try_reboot_on_timeout: bool = False
+    """If True, the bridge will attempt to reboot the device if it times out. This is a bit hacky and it requires 
+    direct connectivity between the bridge and the device. Default: False. """
 
 
 CONFIG = Config()
