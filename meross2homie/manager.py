@@ -250,7 +250,9 @@ class BridgeManager(IMerossManager):
             if homie_device:
                 await homie_device.set_state(HomieState.LOST)
         # Perform one reboot attempt
-        if self.timed_out_commands_count[uuid] == CONFIG.timed_out_commands_threshold and CONFIG.try_reboot_on_timeout:
+        if (
+            self.timed_out_commands_count[uuid] % CONFIG.timed_out_commands_threshold == 0
+        ) and CONFIG.try_reboot_on_timeout:
             if hd := self.homie_devices.get(uuid):
                 asyncio.create_task(hd.reboot())
 

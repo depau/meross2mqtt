@@ -164,7 +164,7 @@ class MerossHomieDevice(HomieDevice):
                     # The request WILL time out. But we still need to await it.
                     await resp.json()
                     raise RuntimeError("Device unexpectedly responded to reboot request")
-        except TimeoutError:
+        except (TimeoutError, asyncio.TimeoutError):
             logger.info(f"Reboot request for {self.dev_info.uuid} ({self.name}) sent")
 
     def _populate(self):
