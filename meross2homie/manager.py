@@ -6,9 +6,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from typing import Optional, Iterable, Union, List, cast, Dict
 
-import aiohttp
 import asyncio_mqtt
-from aiohttp import ClientTimeout
 from loguru import logger
 from meross_iot.device_factory import build_meross_device_from_abilities
 from meross_iot.manager import TransportMode, DeviceRegistry
@@ -25,7 +23,6 @@ from meross2homie.meross import (
     meross_mqtt_payload,
     MerossMqttDeviceInfo,
     is_uuid,
-    meross_http_payload,
 )
 from meross2homie.persistence import Persistence
 
@@ -223,27 +220,6 @@ class BridgeManager(IMerossManager):
         except Exception:
             logger.exception(f"Unhandled exception while handling message: {message}")
 
-    async def _attempt_reboot(self, uuid: str):
-        homie_device = self.homie_devices[uuid]
-        logger.info(f"Attempting to reboot device {uuid} ({homie_device.name}) via HTTP")
-        ip_addr = homie_device.dev_info.ip_address
-        if (dev_config := CONFIG.devices.get(uuid)) and dev_config.meross_key:
-            dev_key = dev_config.meross_key
-        else:
-            dev_key = CONFIG.meross_key
-        try:
-            async with aiohttp.ClientSession(timeout=ClientTimeout(total=CONFIG.command_timeout)) as session:
-                # The device will reboot if we send a request to an invalid namespace.
-                async with session.post(
-                    f"http://{ip_addr}/config",
-                    json=meross_http_payload("GET", "Appliance.System.Cucumbers", {}, dev_key),
-                ) as resp:
-                    # The request WILL time out. But we still need to await it.
-                    await resp.json()
-                    raise RuntimeError("Device unexpectedly responded to reboot request")
-        except TimeoutError:
-            logger.info(f"Reboot request for {uuid} ({homie_device.name}) sent")
-
     async def __aenter__(self):
         self.ctx_manager = AsyncExitStack()
         await self.ctx_manager.__aenter__()
@@ -275,7 +251,8 @@ class BridgeManager(IMerossManager):
                 await homie_device.set_state(HomieState.LOST)
         # Perform one reboot attempt
         if self.timed_out_commands_count[uuid] == CONFIG.timed_out_commands_threshold and CONFIG.try_reboot_on_timeout:
-            asyncio.create_task(self._attempt_reboot(uuid))
+            if hd := self.homie_devices.get(uuid):
+                asyncio.create_task(hd.reboot())
 
     async def _on_device_responded(self, uuid: str):
         if self.timed_out_commands_count.get(uuid, -1) != 0:
