@@ -97,7 +97,7 @@ class BridgeManager(IMerossManager):
                         )
                     )
                 )
-            except (CommandTimeoutError, TimeoutError):
+            except (CommandTimeoutError, TimeoutError, asyncio.TimeoutError, asyncio.CancelledError):
                 logger.error("Command timed out")
             except (KeyboardInterrupt, SystemExit):
                 raise
@@ -303,11 +303,17 @@ class BridgeManager(IMerossManager):
             if hd is not None:
                 asyncio.create_task(hd.set_state(HomieState.READY))
             return res
-        except asyncio.TimeoutError:
-            self.pending_commands.pop(message_id).cancel()
+        except (asyncio.TimeoutError, TimeoutError) as e:
+            if task := self.pending_commands.pop(message_id):
+                task.cancel()
             logger.error(f"Command {method} {namespace.value} to device {uuid} timed out.")
             await self._on_device_timeout(uuid)
-            raise CommandTimeoutError(message.decode("utf-8"), uuid, timeout)
+            raise CommandTimeoutError(message.decode("utf-8"), uuid, timeout) from e
+        except asyncio.CancelledError as e:
+            if task := self.pending_commands.pop(message_id):
+                task.cancel()
+            logger.warning(f"Command {method} {namespace.value} to device {uuid} was cancelled.")
+            raise CommandTimeoutError(message.decode("utf-8"), uuid, timeout) from e
 
     async def async_execute_cmd(
         self,
