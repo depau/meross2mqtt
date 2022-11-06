@@ -632,8 +632,8 @@ class HomieDurationProperty(HomieProperty[timedelta]):
         return isodate.parse_duration(value)
 
 
-JsonSerializable = Union[
-    None, bool, int, float, str, List["JsonSerializable"], Dict[str, "JsonSerializable"]
+JsonSerializable = Union[  # type: ignore
+    None, bool, int, float, str, List["JsonSerializable"], Dict[str, "JsonSerializable"]  # type: ignore
 ]  # type: ignore
 
 

@@ -296,7 +296,7 @@ class BridgeManager(IMerossManager):
         future: Future[dict] = asyncio.Future()
         self.pending_commands[message_id] = future
 
-        logger.trace(f"Sending message to {uuid}: {message}")
+        logger.trace(f"Sending message to {uuid}: {message.decode()}")
         await self.mqtt.publish(f"{CONFIG.meross_prefix}/{uuid}/subscribe", message, qos=1)
 
         try:

@@ -32,7 +32,7 @@ T = TypeVar("T")
 
 def simple_setter(awaitable: Callable[[T], Awaitable[Any]]) -> Callable[[T], Awaitable[T]]:
     async def _setter(value: Any):
-        future = Future()
+        future: Future[None] = Future()
 
         async def waiter():
             try:
