@@ -1,6 +1,7 @@
 import asyncio
+from asyncio import Future
 from datetime import datetime
-from typing import TypeVar, Iterable, Callable, Awaitable, Any
+from typing import TypeVar, Iterable, Callable, Awaitable, Any, Coroutine
 
 import aiohttp
 from aiohttp import ClientTimeout
@@ -29,9 +30,23 @@ MD = TypeVar("MD", bound=BaseDevice)
 T = TypeVar("T")
 
 
-def simple_setter(awaitable: Callable[[T], Awaitable[Any]]) -> Callable[[T], Awaitable[T]]:
+def simple_setter(awaitable: Callable[[T], Coroutine[Any]]) -> Callable[[T], Awaitable[T]]:
     async def _setter(value: Any):
-        await awaitable(value)
+        future = Future()
+
+        async def waiter():
+            try:
+                await awaitable(value)
+            finally:
+                future.set_result(None)
+
+        asyncio.create_task(waiter())
+
+        try:
+            await asyncio.wait_for(future, timeout=0.5)
+        except (TimeoutError, asyncio.TimeoutError):
+            pass
+
         return value
 
     return _setter

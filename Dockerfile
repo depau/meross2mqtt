@@ -3,9 +3,10 @@
 FROM python:3.10
 
 RUN --mount=target=/app \
+    --mount=target=/root/.cache/pip,type=cache \
     cp -a /app /tmp/app && \
     cd /tmp/app && \
-    pip install --no-cache-dir . && \
+    pip install --compile . && \
     rm -Rf /tmp/app && \
     mkdir -p /config
 
