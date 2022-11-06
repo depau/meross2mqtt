@@ -30,7 +30,7 @@ MD = TypeVar("MD", bound=BaseDevice)
 T = TypeVar("T")
 
 
-def simple_setter(awaitable: Callable[[T], Coroutine[Any]]) -> Callable[[T], Awaitable[T]]:
+def simple_setter(awaitable: Callable[[T], Awaitable[Any]]) -> Callable[[T], Awaitable[T]]:
     async def _setter(value: Any):
         future = Future()
 
