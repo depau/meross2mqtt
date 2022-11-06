@@ -105,13 +105,17 @@ class HomieTopologyMixin(Generic[HT], ABC):
 
     async def refresh(self):
         updates = []
-        if self.get_value() is not None:
-            updates.append(self.post_value("", self.get_value(), self.retained))
 
         # Force a full update every minute
         full_update = time.time() - self.attributes_last_full_update > 60
         if full_update:
             self.attributes_last_full_update = time.time()
+
+        if self.get_value() is not None:
+            if self.attributes_cache.get("$value", None) != self.get_value():
+                value = self.get_value()
+                updates.append(self.post_value("", value, self.retained))
+                self.attributes_cache["$value"] = value
 
         attributes = self.get_attributes()
         for topic, value in attributes.items():
