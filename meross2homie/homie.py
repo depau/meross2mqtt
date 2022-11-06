@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from abc import ABC
 from collections.abc import Callable
 from contextlib import AsyncExitStack
@@ -82,9 +83,15 @@ HT = TypeVar("HT", bound="HomieTopologyMixin")
 
 
 class HomieTopologyMixin(Generic[HT], ABC):
+    attributes_cache: Dict[str, str]
+    attributes_last_full_update: float
     retained: bool = False
     children: Dict[str, HT] = {}
-    attributes_cache: Dict[str, str] = {}
+
+    def __init__(self, *args, **kwargs):
+        super(HomieTopologyMixin, self).__init__(*args, **kwargs)
+        self.attributes_cache = {}
+        self.attributes_last_full_update = 0
 
     def get_attributes(self) -> Dict[str, str]:
         raise NotImplementedError
@@ -101,9 +108,14 @@ class HomieTopologyMixin(Generic[HT], ABC):
         if self.get_value() is not None:
             updates.append(self.post_value("", self.get_value(), self.retained))
 
+        # Force a full update every minute
+        full_update = time.time() - self.attributes_last_full_update > 60
+        if full_update:
+            self.attributes_last_full_update = time.time()
+
         attributes = self.get_attributes()
         for topic, value in attributes.items():
-            if topic not in self.attributes_cache or self.attributes_cache[topic] != value:
+            if full_update or topic not in self.attributes_cache or self.attributes_cache[topic] != value:
                 # noinspection PyShadowingNames
                 async def post_attr(topic, value):
                     await self.post_value(topic, value, True)
@@ -157,6 +169,7 @@ class Homie(GetChildrenMixin["HomieDevice"]):
         async_mqtt_client_factory: Callable[[asyncio_mqtt.Will, str], asyncio_mqtt.Client],
         root_topic: str = "homie",
     ):
+        super(Homie, self).__init__()
         self.topic: str = root_topic
         self.async_mqtt_client_factory = async_mqtt_client_factory
         self.children: Dict[str, "HomieDevice"] = {}
@@ -196,6 +209,7 @@ class HomieDevice(
     mqtt: asyncio_mqtt.Client
 
     def __init__(self, name: str):
+        super(HomieDevice, self).__init__()
         self.name = name
         self.children: Dict[str, HomieNode] = {}
         self._state = HomieState.INIT
@@ -295,6 +309,7 @@ class HomieNode(
         name: str,
         node_type: str,
     ):
+        super(HomieNode, self).__init__()
         self.device = device
         self.topic = topic
         self.name = name
@@ -348,6 +363,7 @@ class HomieProperty(Generic[T], HomieTopologyMixin[None], SubscriptionsMixin[Non
         data_format: Optional[str] = None,
         unit: Optional[str] = None,
     ):
+        super(HomieProperty, self).__init__()
         self.node = node
         self.topic = topic
         self.name = name
@@ -547,7 +563,7 @@ class HomieEnumProperty(Generic[E], HomieProperty[E]):
         setter: Optional[Callable[[E], Awaitable[Optional[E]]]] = None,
     ):
         enum_values: List[str] = [e.value for e in enum_type]
-        assert len(enum_values) > 1 and type(enum_values[0]) is str
+        assert len(enum_values) > 0 and type(enum_values[0]) is str
         super().__init__(
             node,
             topic,

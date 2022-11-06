@@ -1,7 +1,7 @@
 import asyncio
 from asyncio import Future
 from datetime import datetime
-from typing import TypeVar, Iterable, Callable, Awaitable, Any, Coroutine
+from typing import TypeVar, Iterable, Callable, Awaitable, Any
 
 import aiohttp
 from aiohttp import ClientTimeout
@@ -97,6 +97,7 @@ class MerossHomieDevice(HomieDevice):
         md = self.meross_device
         updates = []
 
+        await self.refresh()
         await md.async_update()
 
         if isinstance(md, ToggleMixin) or isinstance(md, ToggleXMixin):
