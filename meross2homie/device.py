@@ -3,8 +3,6 @@ from asyncio import Future
 from datetime import datetime
 from typing import TypeVar, Iterable, Callable, Awaitable, Any
 
-import aiohttp
-from aiohttp import ClientTimeout
 from loguru import logger
 from meross_iot.controller.device import BaseDevice
 
@@ -15,7 +13,6 @@ from meross_iot.controller.mixins.electricity import ElectricityMixin
 from meross_iot.controller.mixins.toggle import ToggleMixin, ToggleXMixin
 from meross_iot.model.enums import DNDMode, Namespace
 
-from meross2homie.config import CONFIG
 from meross2homie.homie import (
     HomieDevice,
     HomieNode,
@@ -24,7 +21,7 @@ from meross2homie.homie import (
     HomieFloatProperty,
     HomieCommandProperty,
 )
-from meross2homie.meross import MerossMqttDeviceInfo, IMerossManager, meross_http_payload
+from meross2homie.meross import MerossMqttDeviceInfo, IMerossManager, reboot_device
 
 MD = TypeVar("MD", bound=BaseDevice)
 T = TypeVar("T")
@@ -164,24 +161,7 @@ class MerossHomieDevice(HomieDevice):
             logger.warning(f"Unhandled notification: {message}")
 
     async def reboot(self):
-        logger.info(f"Attempting to reboot device {self.dev_info.uuid} ({self.name}) via HTTP")
-        ip_addr = self.dev_info.ip_address
-        if (dev_config := CONFIG.devices.get(self.dev_info.uuid)) and dev_config.meross_key:
-            dev_key = dev_config.meross_key
-        else:
-            dev_key = CONFIG.meross_key
-        try:
-            async with aiohttp.ClientSession(timeout=ClientTimeout(total=CONFIG.command_timeout)) as session:
-                # The device will reboot if we send a request to an invalid namespace.
-                async with session.post(
-                    f"http://{ip_addr}/config",
-                    json=meross_http_payload("GET", "Appliance.System.Cucumbers", {}, dev_key),
-                ) as resp:
-                    # The request WILL time out. But we still need to await it.
-                    await resp.json()
-                    raise RuntimeError("Device unexpectedly responded to reboot request")
-        except (TimeoutError, asyncio.TimeoutError):
-            logger.info(f"Reboot request for {self.dev_info.uuid} ({self.name}) sent")
+        await reboot_device(self.dev_info.uuid, self.dev_info.ip_address)
 
     def _populate(self):
         md = self.meross_device

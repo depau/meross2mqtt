@@ -23,8 +23,9 @@ from meross2homie.meross import (
     meross_mqtt_payload,
     MerossMqttDeviceInfo,
     is_uuid,
+    reboot_device,
 )
-from meross2homie.persistence import Persistence
+from meross2homie.persistence import Persistence, DeviceProps
 
 
 def mqtt_factory(
@@ -135,7 +136,7 @@ class BridgeManager(IMerossManager):
             else:
                 topic = uuid
 
-            self.persistence.devices.add(uuid)
+            self.persistence.devices[uuid] = DeviceProps(ip_address=dev_info.ip_address)
             self.persistence.persist(CONFIG.persistence_file)
 
             logger.debug(f"Registering device {uuid} as {topic}")
@@ -148,6 +149,10 @@ class BridgeManager(IMerossManager):
             logger.debug(f"Device {uuid} ready")
 
         except CommandTimeoutError:
+            if retries_left == 1 and uuid in self.persistence.devices and self.persistence.devices[uuid].ip_address:
+                logger.warning(f"Before last interview attempt, try rebooting the device {uuid}")
+                await reboot_device(uuid, self.persistence.devices[uuid].ip_address)
+
             if retries_left > 0:
                 delay = random.uniform(*CONFIG.interview_retry_delay_range)
                 logger.error(

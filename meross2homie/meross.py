@@ -1,9 +1,13 @@
+import asyncio
 import json
 import random
 import time
 from hashlib import md5
 from typing import Protocol, Optional, Iterable, Union, List, TypeVar, Tuple
 
+import aiohttp
+from aiohttp import ClientTimeout
+from loguru import logger
 from meross_iot.manager import TransportMode
 from meross_iot.model.enums import OnlineStatus, Namespace
 from meross_iot.model.http.device import HttpDeviceInfo
@@ -72,6 +76,26 @@ def meross_http_payload(
         "payload": payload,
     }
     return data
+
+
+async def reboot_device(uuid: str, ip_address: str):
+    logger.info(f"Attempting to reboot device {uuid} via HTTP")
+    if (dev_config := CONFIG.devices.get(uuid)) and dev_config.meross_key:
+        dev_key = dev_config.meross_key
+    else:
+        dev_key = CONFIG.meross_key
+    try:
+        async with aiohttp.ClientSession(timeout=ClientTimeout(total=CONFIG.command_timeout)) as session:
+            # The device will reboot if we send a request to an invalid namespace.
+            async with session.post(
+                f"http://{ip_address}/config",
+                json=meross_http_payload("GET", "Appliance.System.Cucumbers", {}, dev_key),
+            ) as resp:
+                # The request WILL time out. But we still need to await it.
+                await resp.json()
+                raise RuntimeError("Device unexpectedly responded to reboot request")
+    except (TimeoutError, asyncio.TimeoutError):
+        logger.info(f"Reboot request for {uuid} sent")
 
 
 def is_uuid(uuid: str) -> bool:

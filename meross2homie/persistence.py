@@ -1,20 +1,28 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Set
+from typing import Dict, Optional
 
 from dataclasses_json import DataClassJsonMixin
 
 
 @dataclass
+class DeviceProps(DataClassJsonMixin):
+    ip_address: Optional[str] = None
+
+
+@dataclass
 class Persistence(DataClassJsonMixin):
-    devices: Set[str] = field(default_factory=set)
+    devices: Dict[str, DeviceProps] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: Path):
         if path.exists():
             with open(path) as f:
-                return cls.from_dict(json.load(f))
+                j = json.load(f)
+                if "devices" in j and not isinstance(j["devices"], dict):
+                    j["devices"] = {i: DeviceProps() for i in j["devices"]}
+                return cls.from_dict(j)
         return cls()
 
     def persist(self, path: Path):
