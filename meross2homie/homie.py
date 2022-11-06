@@ -560,10 +560,10 @@ class HomieEnumProperty(Generic[E], HomieProperty[E]):
         self.enum = enum_type
 
     def serialize(self, value: E) -> str:
-        return value.name
+        return str(value.value)
 
     def deserialize(self, value: str) -> E:
-        return self.enum[value]
+        return self.enum(value)
 
 
 class HomieDateTimeProperty(HomieProperty[datetime]):
@@ -648,8 +648,7 @@ class HomieJsonProperty(HomieProperty[JsonSerializable]):
 
 
 class Commands(Enum):
-    REQUEST = "request"
-    REQUESTED = "requested"
+    REQUEST = "REQUEST"
 
 
 C = TypeVar("C", bound=Enum)
@@ -671,7 +670,7 @@ class HomieCommandProperty(Generic[E], HomieEnumProperty[E]):
     async def handle_set_payload(self, payload: str) -> Optional[E]:
         res = await super().handle_set_payload(payload)
         if res is None and self.enum_type is Commands:
-            res = self.enum_type.REQUESTED  # type: ignore
+            res = self.enum_type.REQUEST  # type: ignore
         await self.update_value(res)  # type: ignore
         return res
 
