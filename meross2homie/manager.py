@@ -148,7 +148,7 @@ class BridgeManager(IMerossManager):
             await homie_device.set_state(HomieState.READY)
             logger.debug(f"Device {uuid} ready")
 
-        except CommandTimeoutError:
+        except CommandTimeoutError as e:
             if retries_left == 1 and uuid in self.persistence.devices and self.persistence.devices[uuid].ip_address:
                 logger.warning(f"Before last interview attempt, try rebooting the device {uuid}")
                 await reboot_device(uuid, self.persistence.devices[uuid].ip_address)
@@ -161,7 +161,7 @@ class BridgeManager(IMerossManager):
                 await asyncio.sleep(delay)
                 await self._interview(uuid, retries_left - 1)
             else:
-                logger.exception(f"Command timed out while interviewing device {uuid}, giving up")
+                logger.error(f"Command timed out while interviewing device {uuid}, giving up: {e.message}")
 
     async def _handle_message(self, topic: str, message: dict):
         # noinspection PyBroadException
