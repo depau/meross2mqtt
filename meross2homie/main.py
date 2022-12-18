@@ -13,7 +13,6 @@ from meross2homie.manager import BridgeManager
 def main(argv: Optional[List[str]] = None):
     # Set loglevel to debug
     logger.remove()
-    logger.add(sys.stderr, level="DEBUG")
 
     if argv is None:
         argv = sys.argv[1:]
@@ -26,6 +25,8 @@ def main(argv: Optional[List[str]] = None):
         CONFIG.load(argv[0])
     else:
         CONFIG.load()
+
+    logger.add(sys.stderr, level=CONFIG.log_level)
 
     loop = asyncio.get_event_loop()
 

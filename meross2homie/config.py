@@ -24,6 +24,8 @@ class DeviceConfig(DataClassJsonMixin):
 
 @dataclass
 class Config(YamlDataClassConfig):
+    log_level: str = "INFO"
+
     # MQTT broker standard parameters
     mqtt_host: str = None  # type: ignore
     mqtt_port: int = 1883
