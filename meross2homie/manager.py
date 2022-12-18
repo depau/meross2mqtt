@@ -4,9 +4,11 @@ import random
 from asyncio import Future
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
-from typing import Optional, Iterable, Union, List, cast, Dict
+from typing import Optional, Iterable, Union, List, cast, Dict, TypeVar
 
+import aiohttp
 import asyncio_mqtt
+from aiohttp import ClientTimeout
 from loguru import logger
 from meross_iot.device_factory import build_meross_device_from_abilities
 from meross_iot.manager import TransportMode, DeviceRegistry
@@ -19,13 +21,15 @@ from meross2homie.device import MerossHomieDevice
 from meross2homie.homie import Homie, HomieState
 from meross2homie.meross import (
     IMerossManager,
-    T,
+    meross_http_payload,
     meross_mqtt_payload,
     MerossMqttDeviceInfo,
     is_uuid,
     reboot_device,
 )
 from meross2homie.persistence import Persistence, DeviceProps
+
+T = TypeVar("T")
 
 
 def mqtt_factory(
@@ -276,7 +280,11 @@ class BridgeManager(IMerossManager):
         namespace: Namespace,
         payload: Optional[dict] = None,
         timeout: Optional[float] = None,
+        override_transport_mode: TransportMode = None,
     ) -> dict:
+        if override_transport_mode is None:
+            override_transport_mode = TransportMode.LAN_HTTP_FIRST
+
         if timeout is None:
             timeout = CONFIG.command_timeout
 
@@ -290,18 +298,60 @@ class BridgeManager(IMerossManager):
         else:
             dev_key = CONFIG.meross_key
 
+        if (
+            CONFIG.enable_http
+            and override_transport_mode != TransportMode.MQTT_ONLY
+            and (
+                (override_transport_mode == TransportMode.LAN_HTTP_FIRST_ONLY_GET and method == "GET")
+                or override_transport_mode == TransportMode.LAN_HTTP_FIRST
+            )
+            and (
+                (
+                    uuid in self.homie_devices
+                    and self.homie_devices[uuid].dev_info
+                    and (ip_address := self.homie_devices[uuid].dev_info.ip_address)
+                )
+                or (uuid in self.persistence.devices and (ip_address := self.persistence.devices[uuid].ip_address))
+            )
+        ):
+            try:
+                return await self.rpc_http(uuid, ip_address, method, namespace, payload, dev_key, timeout)
+            except (TimeoutError, asyncio.TimeoutError):
+                # Try again with MQTT
+                pass
+
+        return await self.rpc_mqtt(
+            uuid,
+            method,
+            namespace,
+            payload,
+            dev_key,
+            f"{sent_prefix}/m2h-{CONFIG.meross_bridge_topic}/subscribe",
+            timeout,
+        )
+
+    async def rpc_mqtt(
+        self,
+        uuid: str,
+        method: str,
+        namespace: Namespace,
+        payload: dict,
+        dev_key: str,
+        header_from: str,
+        timeout: float,
+    ) -> dict:
         message, message_id = meross_mqtt_payload(
             method=method,
             namespace=cast(str, namespace.value),
             payload=payload,
             dev_key=dev_key,
-            header_from=f"{sent_prefix}/m2h-{CONFIG.meross_bridge_topic}/subscribe",
+            header_from=header_from,
         )
 
         future: Future[dict] = asyncio.Future()
         self.pending_commands[message_id] = future
 
-        logger.trace(f"Sending message to {uuid}: {message.decode()}")
+        logger.trace(f"Sending message to {uuid} via MQTT: {message.decode()}")
         await self.mqtt.publish(f"{CONFIG.meross_prefix}/{uuid}/subscribe", message, qos=1)
 
         try:
@@ -322,6 +372,32 @@ class BridgeManager(IMerossManager):
             logger.warning(f"Command {method} {namespace.value} to device {uuid} was cancelled.")
             raise CommandTimeoutError(message.decode("utf-8"), uuid, timeout) from e
 
+    async def rpc_http(
+        self, uuid: str, ip_address: str, method: str, namespace: Namespace, payload: dict, dev_key: str, timeout: float
+    ) -> dict:
+
+        message = meross_http_payload(
+            method=method,
+            namespace=cast(str, namespace.value),
+            payload=payload,
+            dev_key=dev_key,
+        )
+
+        logger.trace(f"Sending message to {uuid} via HTTP: {message}")
+        try:
+            async with aiohttp.ClientSession(timeout=ClientTimeout(total=timeout)) as session:
+                # The device will reboot if we send a request to an invalid namespace.
+                async with session.post(
+                    f"http://{ip_address}/config",
+                    json=message,
+                ) as resp:
+                    j = await resp.json()
+                    await self._on_device_responded(uuid)
+                    return j
+        except (TimeoutError, asyncio.TimeoutError):
+            logger.warning(f"HTTP request timed out")
+            raise
+
     async def async_execute_cmd(
         self,
         mqtt_hostname: str,
@@ -336,7 +412,9 @@ class BridgeManager(IMerossManager):
         **kw,
     ) -> dict:
         """Used by meross_iot module"""
-        return (await self.rpc(destination_device_uuid, method, namespace, payload, timeout))["payload"]
+        return (await self.rpc(destination_device_uuid, method, namespace, payload, timeout, override_transport_mode))[
+            "payload"
+        ]
 
     def find_devices(
         self,

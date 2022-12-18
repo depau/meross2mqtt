@@ -66,6 +66,7 @@ def meross_http_payload(
     timestamp, message_id, signature = _gen_boilerplate(dev_key)
     data = {
         "header": {
+            "from": "",
             "messageId": message_id,  # Example: "122e3e47835fefcd8aaf22d13ce21859"
             "method": method,  # Example: "GET",
             "namespace": namespace,  # Example: "Appliance.System.All",
@@ -86,10 +87,10 @@ async def reboot_device(uuid: str, ip_address: str):
         dev_key = CONFIG.meross_key
     try:
         async with aiohttp.ClientSession(timeout=ClientTimeout(total=CONFIG.command_timeout)) as session:
-            # The device will reboot if we send a request to an invalid namespace.
+            # The device will reboot if we send an invalid payload, likely it's crashing and soft-resetting.
             async with session.post(
                 f"http://{ip_address}/config",
-                json=meross_http_payload("GET", "Appliance.System.Cucumbers", {}, dev_key),
+                json="remind ya - I'm kinda - WET - run it down my ******",
             ) as resp:
                 # The request WILL time out. But we still need to await it.
                 await resp.json()

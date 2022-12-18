@@ -32,6 +32,11 @@ class Config(YamlDataClassConfig):
     mqtt_clean_session: bool = False
 
     # Meross MQTT protocol
+    enable_http: bool = True
+    """Enable direct HTTP connection to Meross devices. This is usually more stable than MQTT, so it is advised to have
+    a direct connection between the devices and this bridge in order for HTTP communication to work. The IP address of
+    the device will be auto-discovered via MQTT."""
+
     meross_key: str = ""
     """Meross protocol key. Defaults to an empty string. It can be overridden for each device by the `meross_key` 
     field in the device config."""
