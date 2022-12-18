@@ -30,6 +30,30 @@ The following capabilities are currently supported:
 - Electricity: (current voltage, current and power)
 - Do not disturb (device LED setting)
 
+## Stability
+
+The devices have some issues staying connected to the MQTT broker. They usually stay up for a day or so, then at some
+point they stay connected but stop responding to requests.
+
+This is not a problem when using HTTP to perform requests. Therefore it is recommended to place the broker and the
+devices on the same network, or to add appropriate routes and firewall rules to allow direct communication.
+
+### Usage
+
+See the instructions below to add a configuration file and connect to the MQTT broker.
+
+Start the broker and power-cycle the devices, so they are noticed by the bridge, or perform the pairing procedure.
+
+The bridge will automatically accept any device that sends valid messages to the broker, and acknowledge any outstanding
+pairing requests when you use the pairing app. It will also automatically discover the devices' IP addresses and try to
+use them for HTTP direct requests.
+
+All discovered devices and their IP addresses are remembered in an automatically created `devices.json` file. If you
+want to remove a device, stop the bridge, unplug the device, remove the device from the JSON file and restart the
+bridge.
+
+The bridge will attempt to use all remembered devices on startup, without requiring you to power-cycle them.
+
 ## Installation
 
 ### Docker
@@ -48,6 +72,19 @@ DOCKER_BUILDKIT=1 docker build -t meross2homie .
 Mount the configuration directory as a writable volume to `/config`. The folder must be writable since the app will need
 to store the list of discovered devices.
 
+`docker-compose.yml` example:
+
+```yaml
+version: '3'
+
+services:
+  meross2homie:
+    build: ./meross2homie
+    volumes:
+      - ./config:/config   # Do not mount as read-only
+    restart: unless-stopped
+```
+
 ### Python
 
 Python 3.10 is required.
@@ -58,7 +95,7 @@ cd meross2homie
 pip install .
 
 # To start the bridge
-meross2homie
+meross2homie ./config.yml
 ```
 
 ## Configuration
@@ -69,6 +106,9 @@ it manually. Or pass it as a command line argument.
 All settings are optional, except for the MQTT broker settings.
 
 ```yaml
+# Logging level, one of: TRACE, DEBUG, INFO, WARNING, ERROR; default: INFO
+log_level: INFO  # Optional
+
 # MQTT broker settings
 mqtt_host: ""
 mqtt_port: 1883
@@ -78,6 +118,11 @@ mqtt_clean_session: true  # Optional
 
 
 # Meross MQTT protocol settings
+
+# Whether to enable connecting to the devices over HTTP. This is highly recommended, but it requires extra care to 
+# ensure the broker has direct access to the devices. When this is off all requests will be sent over MQTT, except for
+# reboot attempts if enabled.
+enable_http: true  # Optional
 
 # Key provided in the pairing app. It can be overridden on a per-device basis.
 meross_key: ""                   # Optional
