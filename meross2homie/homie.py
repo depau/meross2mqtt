@@ -21,7 +21,7 @@ from typing import (
     Any,
 )
 
-import asyncio_mqtt
+import aiomqtt
 import isodate as isodate
 from loguru import logger
 from paho.mqtt.client import MQTTMessage
@@ -170,7 +170,7 @@ P = ParamSpec("P")
 class Homie(GetChildrenMixin["HomieDevice"]):
     def __init__(
         self,
-        async_mqtt_client_factory: Callable[[asyncio_mqtt.Will, str], asyncio_mqtt.Client],
+        async_mqtt_client_factory: Callable[[aiomqtt.Will, str], aiomqtt.Client],
         root_topic: str = "homie",
     ):
         super(Homie, self).__init__()
@@ -182,7 +182,7 @@ class Homie(GetChildrenMixin["HomieDevice"]):
     async def add_device(self, device: HD, topic: str):
         logger.info(f"Starting device '{topic}'")
         dev_mqtt = self.async_mqtt_client_factory(
-            asyncio_mqtt.Will(f"{self.topic}/{topic}/$state", "lost", True),
+            aiomqtt.Will(f"{self.topic}/{topic}/$state", "lost", True),
             f"m2h.homie_dev.{topic}",
         )
         device.set_mqtt(dev_mqtt, f"{self.topic}/{topic}")
@@ -210,7 +210,7 @@ class HomieDevice(
     HomieTopologyMixin["HomieNode"], SubscriptionsMixin["HomieNode"], StateMixin, GetChildrenMixin["HomieNode"]
 ):
     topic: str
-    mqtt: asyncio_mqtt.Client
+    mqtt: aiomqtt.Client
 
     def __init__(self, name: str):
         super(HomieDevice, self).__init__()
@@ -218,7 +218,7 @@ class HomieDevice(
         self.children: Dict[str, HomieNode] = {}
         self._state = HomieState.INIT
 
-    def set_mqtt(self, mqtt: asyncio_mqtt.Client, topic: str):
+    def set_mqtt(self, mqtt: aiomqtt.Client, topic: str):
         self.mqtt = mqtt
         self.topic = topic
 
@@ -253,7 +253,7 @@ class HomieDevice(
 
     async def process_messages(self):
         logger.info(f"Device {self.name} starting message processing")
-        async for message in self.mqtt.unfiltered_messages():
+        async for message in self.mqtt.messages:
             # noinspection PyBroadException
             try:
                 message = cast(MQTTMessage, message)

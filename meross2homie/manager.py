@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Iterable, Union, List, cast, Dict, TypeVar
 
 import aiohttp
-import asyncio_mqtt
+import aiomqtt
 from aiohttp import ClientTimeout
 from loguru import logger
 from meross_iot.device_factory import build_meross_device_from_abilities
@@ -33,18 +33,18 @@ T = TypeVar("T")
 
 
 def mqtt_factory(
-    will: Optional[asyncio_mqtt.Will] = None, client_id_prefix: Optional[str] = None
-) -> asyncio_mqtt.Client:
+    will: Optional[aiomqtt.Will] = None, client_id_prefix: Optional[str] = None
+) -> aiomqtt.Client:
     if not client_id_prefix:
         client_id_prefix = f"meross2homie"
     client_id = f"{client_id_prefix}_{random.randint(0, 1000000)}"
 
-    client = asyncio_mqtt.Client(
+    client = aiomqtt.Client(
         hostname=CONFIG.mqtt_host,
         port=CONFIG.mqtt_port,
         username=CONFIG.mqtt_username,
         password=CONFIG.mqtt_password,
-        client_id=client_id,
+        identifier=client_id,
         will=will,
         clean_session=CONFIG.mqtt_clean_session,
     )
@@ -84,7 +84,7 @@ class BridgeManager(IMerossManager):
             asyncio.create_task(self._interview(uuid))
 
     async def _receive_messages(self):
-        async for message in self.mqtt.unfiltered_messages():
+        async for message in self.mqtt.messages:
             message = cast(MQTTMessage, message)
             # We must not block the parent coroutine, or else we won't be able to receive responses to RPC commands
             asyncio.create_task(self._handle_message(message.topic, json.loads(message.payload.decode())))
