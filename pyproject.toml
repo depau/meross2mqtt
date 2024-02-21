@@ -21,7 +21,7 @@ classifiers = [
     "Topic :: Software Development :: Object Brokering"
 ]
 dependencies = [
-    "asyncio-mqtt>=0.13.0,<0.14.0",
+    "asyncio-mqtt==0.13.0",
     "meross_iot==0.4.5.0",
     "aiohttp>=3.8.3,<4.0.0",
     "isodate",

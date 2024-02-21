@@ -253,30 +253,29 @@ class HomieDevice(
 
     async def process_messages(self):
         logger.info(f"Device {self.name} starting message processing")
-        async with self.mqtt.unfiltered_messages() as messages:
-            async for message in messages:
-                # noinspection PyBroadException
-                try:
-                    message = cast(MQTTMessage, message)
-                    topic = message.topic
+        async for message in self.mqtt.unfiltered_messages():
+            # noinspection PyBroadException
+            try:
+                message = cast(MQTTMessage, message)
+                topic = message.topic
 
-                    logger.debug(f"Got Homie message on {topic}: {message.payload}")
+                logger.debug(f"Got Homie message on {topic}: {message.payload}")
 
-                    if not topic.startswith(self.topic):
-                        logger.warning(f"Got message on {topic} but expected {self.topic}")
-                        continue
+                if not topic.startswith(self.topic):
+                    logger.warning(f"Got message on {topic} but expected {self.topic}")
+                    continue
 
-                    payload = message.payload.decode("utf-8")
+                payload = message.payload.decode("utf-8")
 
-                    sub_topic = topic[len(self.topic) + 1 :]
-                    for node in self.children.values():
-                        if sub_topic.startswith(node.topic):
-                            asyncio.create_task(node.process_message(sub_topic, payload))
-                except (KeyboardInterrupt, EOFError):
-                    raise
-                except Exception:
-                    logger.exception("Error processing Homie message")
-                    raise
+                sub_topic = topic[len(self.topic) + 1 :]
+                for node in self.children.values():
+                    if sub_topic.startswith(node.topic):
+                        asyncio.create_task(node.process_message(sub_topic, payload))
+            except (KeyboardInterrupt, EOFError):
+                raise
+            except Exception:
+                logger.exception("Error processing Homie message")
+                raise
 
     def get_attributes(self) -> dict:
         return {
