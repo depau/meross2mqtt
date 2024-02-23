@@ -8,7 +8,7 @@ from typing import Optional, Iterable, Union, List, cast, Dict, TypeVar
 
 import aiohttp
 import aiomqtt
-from aiohttp import ClientTimeout
+from aiohttp import ClientTimeout, ClientConnectorError
 from loguru import logger
 from meross_iot.device_factory import build_meross_device_from_abilities
 from meross_iot.manager import TransportMode, DeviceRegistry
@@ -313,7 +313,7 @@ class BridgeManager(IMerossManager):
         ):
             try:
                 return await self.rpc_http(uuid, ip_address, method, namespace, payload, dev_key, timeout)
-            except (TimeoutError, asyncio.TimeoutError):
+            except (TimeoutError, asyncio.TimeoutError, aiohttp.ClientConnectorError):
                 # Try again with MQTT
                 pass
 
@@ -393,6 +393,9 @@ class BridgeManager(IMerossManager):
                     return j
         except (TimeoutError, asyncio.TimeoutError):
             logger.warning(f"HTTP request timed out")
+            raise
+        except ClientConnectorError as e:
+            logger.warning(f"Device {uuid} is not reachable at {ip_address}: {e}")
             raise
 
     async def async_execute_cmd(
