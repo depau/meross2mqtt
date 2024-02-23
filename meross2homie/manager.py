@@ -32,9 +32,7 @@ from meross2homie.persistence import Persistence, DeviceProps
 T = TypeVar("T")
 
 
-def mqtt_factory(
-    will: Optional[aiomqtt.Will] = None, client_id_prefix: Optional[str] = None
-) -> aiomqtt.Client:
+def mqtt_factory(will: Optional[aiomqtt.Will] = None, client_id_prefix: Optional[str] = None) -> aiomqtt.Client:
     if not client_id_prefix:
         client_id_prefix = f"meross2homie"
     client_id = f"{client_id_prefix}_{random.randint(0, 1000000)}"
@@ -49,7 +47,7 @@ def mqtt_factory(
         clean_session=CONFIG.mqtt_clean_session,
     )
     # Yes Karen, you can send all of them in no time
-    client._pending_calls_threshold = 200
+    client.pending_calls_threshold = 200
 
     return client
 
