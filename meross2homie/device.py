@@ -90,6 +90,31 @@ class MerossHomieDevice(HomieDevice):
         yield "org.homie.legacy-firmware:0.1.1:[4.x]"
         yield from super().get_extensions()
 
+    async def _ingest_consumption_payload(self, payload: dict, channel_id: int):
+        updates = []
+        data = payload.get("consumption", payload.get("consumptionx", []))
+
+        # Parse the json data into nice-python native objects
+        stats = [
+            {
+                "timestamp": (
+                    datetime.fromtimestamp(data["timestamp"])
+                    if "timestamp" in data
+                    else datetime.strptime(x.get("date"), _DATE_FORMAT)
+                ),
+                "total_consumption_kwh": float(x.get("value")) / 1000,
+            }
+            for x in data
+        ]
+
+        last = sorted(stats, key=lambda x: x["timestamp"], reverse=True)[0]
+        total = sum(x["total_consumption_kwh"] for x in stats)
+        updates.append(self[_channel_topic("energy", channel_id)]["history"].update_value(stats))
+        updates.append(self[_channel_topic("energy", channel_id)]["daily"].update_value(last["total_consumption_kwh"]))
+        updates.append(self[_channel_topic("energy", channel_id)]["total"].update_value(total))
+
+        await asyncio.gather(*updates)
+
     async def poll(self):
         md = self.meross_device
         updates = []
@@ -113,26 +138,7 @@ class MerossHomieDevice(HomieDevice):
                     payload={"channel": channel_id},
                 )
                 payload = result["payload"]
-                data = payload.get("consumption", payload.get("consumptionx", []))
-
-                # Parse the json data into nice-python native objects
-                stats = [
-                    {
-                        "timestamp": datetime.fromtimestamp(data["timestamp"])
-                        if "timestamp" in data
-                        else datetime.strptime(x.get("date"), _DATE_FORMAT),
-                        "total_consumption_kwh": float(x.get("value")) / 1000,
-                    }
-                    for x in data
-                ]
-
-                last = sorted(stats, key=lambda x: x["timestamp"], reverse=True)[0]
-                total = sum(x["total_consumption_kwh"] for x in stats)
-                updates.append(self[_channel_topic("energy", channel_id)]["history"].update_value(stats))
-                updates.append(
-                    self[_channel_topic("energy", channel_id)]["daily"].update_value(last["total_consumption_kwh"])
-                )
-                updates.append(self[_channel_topic("energy", channel_id)]["total"].update_value(total))
+                updates.append(self._ingest_consumption_payload(payload, channel_id))
 
         if isinstance(md, ElectricityMixin):
             for channel_id in self.channels:
@@ -157,6 +163,10 @@ class MerossHomieDevice(HomieDevice):
             assert isinstance(md, ToggleMixin) or isinstance(md, ToggleXMixin)
             for channel_id in self.channels:
                 await self[_channel_topic("switch", channel_id)]["power"].update_value(md.is_on(channel_id))
+        elif namespace in (Namespace.CONTROL_CONSUMPTION, Namespace.CONTROL_CONSUMPTIONX):
+            assert isinstance(md, ConsumptionMixin) or isinstance(md, ConsumptionXMixin)
+            for channel_id in self.channels:
+                self._ingest_consumption_payload(message["payload"], channel_id)
         else:
             logger.warning(f"Unhandled notification: {message}")
 
