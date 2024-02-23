@@ -1,6 +1,6 @@
-# Meross to Homie bridge
+# Meross to MQTT Homie bridge
 
-A simple bridge between Meross devices and home automation software compatible with Homie, such as openHAB.
+A simple bridge between Meross devices and home automation software compatible with MQTT and Homie autodiscovery, such as openHAB.
 
 <p align="center">
 <a href="https://homieiot.github.io/"><img src="https://homieiot.github.io/img/works-with-homie.svg" alt="Works with Homie" width="200"></a>
