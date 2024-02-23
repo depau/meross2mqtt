@@ -257,7 +257,7 @@ class HomieDevice(
             # noinspection PyBroadException
             try:
                 message = cast(MQTTMessage, message)
-                topic = message.topic
+                topic = str(message.topic)
 
                 logger.debug(f"Got Homie message on {topic}: {message.payload}")
 

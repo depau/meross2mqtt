@@ -87,7 +87,7 @@ class BridgeManager(IMerossManager):
         async for message in self.mqtt.messages:
             message = cast(MQTTMessage, message)
             # We must not block the parent coroutine, or else we won't be able to receive responses to RPC commands
-            asyncio.create_task(self._handle_message(message.topic, json.loads(message.payload.decode())))
+            asyncio.create_task(self._handle_message(str(message.topic), json.loads(message.payload.decode())))
 
     async def _poll(self):
         while True:
