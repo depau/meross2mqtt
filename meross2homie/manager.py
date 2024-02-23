@@ -76,9 +76,15 @@ class BridgeManager(IMerossManager):
 
         self.ctx_manager: Optional[AsyncExitStack] = None
 
+    def _debug_dev_name(self, uuid: str) -> str:
+        if uuid in self.homie_devices:
+            return f"{self.homie_devices[uuid].dev_info.dev_name} ({uuid})"
+        else:
+            return uuid
+
     def _load_persisted_devices(self):
         for uuid in self.persistence.devices:
-            logger.debug(f"Interviewing remembered device {uuid}")
+            logger.debug(f"Interviewing remembered device {self._debug_dev_name(uuid)}")
             asyncio.create_task(self._interview(uuid))
 
     async def _receive_messages(self):
@@ -140,29 +146,31 @@ class BridgeManager(IMerossManager):
             self.persistence.devices[uuid] = DeviceProps(ip_address=dev_info.ip_address)
             self.persistence.persist(CONFIG.persistence_file)
 
-            logger.debug(f"Registering device {uuid} as {topic}")
+            logger.debug(f"Registering device {self._debug_dev_name(uuid)} as {topic}")
 
             self.device_registry.enroll_device(meross_device)
             await self.homie.add_device(homie_device, topic)
             self.homie_devices[uuid] = homie_device
 
             await homie_device.set_state(HomieState.READY)
-            logger.debug(f"Device {uuid} ready")
+            logger.debug(f"Device {self._debug_dev_name(uuid)} ready")
 
         except CommandTimeoutError as e:
             if retries_left == 1 and uuid in self.persistence.devices and self.persistence.devices[uuid].ip_address:
-                logger.warning(f"Before last interview attempt, try rebooting the device {uuid}")
+                logger.warning(f"Before last interview attempt, try rebooting the device {self._debug_dev_name(uuid)}")
                 await reboot_device(uuid, self.persistence.devices[uuid].ip_address)
 
             if retries_left > 0:
                 delay = random.uniform(*CONFIG.interview_retry_delay_range)
                 logger.error(
-                    f"Command timed out while interviewing device {uuid}, retrying in {round(delay, 2)} seconds"
+                    f"Command timed out while interviewing device {self._debug_dev_name(uuid)}, retrying in {round(delay, 2)} seconds"
                 )
                 await asyncio.sleep(delay)
                 await self._interview(uuid, retries_left - 1)
             else:
-                logger.error(f"Command timed out while interviewing device {uuid}, giving up: {e.message}")
+                logger.error(
+                    f"Command timed out while interviewing device {self._debug_dev_name(uuid)}, giving up: {e.message}"
+                )
 
     async def _handle_message(self, topic: str, message: dict):
         # noinspection PyBroadException
@@ -207,19 +215,19 @@ class BridgeManager(IMerossManager):
 
             # Acknowledge bind request
             if namespace == Namespace.CONTROL_BIND and method == "SET":
-                logger.info(f"Received bind request for {uuid}. Acknowledging.")
+                logger.info(f"Received bind request for {self._debug_dev_name(uuid)}. Acknowledging.")
                 await self.rpc(uuid, "SETACK", Namespace.CONTROL_BIND)
                 await self._interview(uuid)
                 return
 
             # Interview new device
             if uuid not in self.homie_devices:
-                logger.info(f"Received message from unknown device {uuid}. Starting interview.")
+                logger.info(f"Received message from unknown device {self._debug_dev_name(uuid)}. Starting interview.")
                 await self._interview(uuid)
                 if uuid not in self.homie_devices:
                     raise RuntimeError("Device interview mysteriously passed without adding a device")
 
-            logger.debug(f"Received message from {uuid}: {message}")
+            logger.debug(f"Received message from {self._debug_dev_name(uuid)}: {message}")
             await self.homie_devices[uuid].on_message(message)
         except CommandTimeoutError:
             logger.error("Command timed out")
@@ -250,7 +258,7 @@ class BridgeManager(IMerossManager):
         self.timed_out_commands_count[uuid] = self.timed_out_commands_count.get(uuid, 0) + 1
         if self.timed_out_commands_count[uuid] >= CONFIG.timed_out_commands_threshold:
             logger.warning(
-                f"Device {uuid} has timed out {self.timed_out_commands_count[uuid]} times. Reporting as offline."
+                f"Device {self._debug_dev_name(uuid)} has timed out {self.timed_out_commands_count[uuid]} times. Reporting as offline."
             )
             homie_device = self.homie_devices.get(uuid)
             if homie_device:
@@ -264,7 +272,7 @@ class BridgeManager(IMerossManager):
 
     async def _on_device_responded(self, uuid: str):
         if self.timed_out_commands_count.get(uuid, -1) != 0:
-            logger.info(f"Device {uuid} has responded after being offline")
+            logger.info(f"Device {self._debug_dev_name(uuid)} has responded after being offline")
             self.timed_out_commands_count[uuid] = 0
             homie_device = self.homie_devices.get(uuid)
             if homie_device:
@@ -360,13 +368,13 @@ class BridgeManager(IMerossManager):
         except (asyncio.TimeoutError, TimeoutError) as e:
             if task := self.pending_commands.pop(message_id):
                 task.cancel()
-            logger.error(f"Command {method} {namespace.value} to device {uuid} timed out.")
+            logger.error(f"Command {method} {namespace.value} to device {self._debug_dev_name(uuid)} timed out.")
             await self._on_device_timeout(uuid)
             raise CommandTimeoutError(message.decode("utf-8"), uuid, timeout) from e
         except asyncio.CancelledError as e:
             if task := self.pending_commands.pop(message_id):
                 task.cancel()
-            logger.warning(f"Command {method} {namespace.value} to device {uuid} was cancelled.")
+            logger.warning(f"Command {method} {namespace.value} to device {self._debug_dev_name(uuid)} was cancelled.")
             raise CommandTimeoutError(message.decode("utf-8"), uuid, timeout) from e
 
     async def rpc_http(
@@ -380,7 +388,7 @@ class BridgeManager(IMerossManager):
             dev_key=dev_key,
         )
 
-        logger.trace(f"Sending message to {uuid} via HTTP: {message}")
+        logger.trace(f"Sending message to {self._debug_dev_name(uuid)} via HTTP: {message}")
         try:
             async with aiohttp.ClientSession(timeout=ClientTimeout(total=timeout)) as session:
                 # The device will reboot if we send a request to an invalid namespace.
@@ -395,7 +403,7 @@ class BridgeManager(IMerossManager):
             logger.warning(f"HTTP request timed out")
             raise
         except ClientConnectorError as e:
-            logger.warning(f"Device {uuid} is not reachable at {ip_address}: {e}")
+            logger.warning(f"Device {self._debug_dev_name(uuid)} is not reachable at {ip_address}: {e}")
             raise
 
     async def async_execute_cmd(
