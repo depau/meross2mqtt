@@ -166,7 +166,7 @@ class MerossHomieDevice(HomieDevice):
         elif namespace in (Namespace.CONTROL_CONSUMPTION, Namespace.CONTROL_CONSUMPTIONX):
             assert isinstance(md, ConsumptionMixin) or isinstance(md, ConsumptionXMixin)
             for channel_id in self.channels:
-                self._ingest_consumption_payload(message["payload"], channel_id)
+                await self._ingest_consumption_payload(message["payload"], channel_id)
         else:
             logger.warning(f"Unhandled notification: {message}")
 
